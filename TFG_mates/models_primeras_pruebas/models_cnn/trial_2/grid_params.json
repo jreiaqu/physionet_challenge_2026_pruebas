@@ -1,0 +1,17 @@
+{
+    "model_type": 0,
+    "n_blocks": 3,
+    "initial_filters": 28,
+    "kernel_size": 27,
+    "pool_size": 1,
+    "stride": 1,
+    "padding": 1,
+    "adaptive_pool": 100,
+    "lstm_hidden": 128,
+    "dense_units": 192,
+    "dropout_rate": 0.5,
+    "max_pool": 0,
+    "lr": 2.8279371875746026e-05,
+    "bs": 8,
+    "ne": 30
+}

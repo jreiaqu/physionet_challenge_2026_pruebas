@@ -1,0 +1,27 @@
+# Datos pesados
+*.hdf5
+*.h5
+
+# Entornos virtuales
+mi_entorno_tfg/
+venv/
+env/
+.env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store

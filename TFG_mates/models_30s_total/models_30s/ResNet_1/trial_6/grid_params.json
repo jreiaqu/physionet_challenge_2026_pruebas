@@ -1,0 +1,12 @@
+{
+    "model_type": 3,
+    "lr": 0.0001,
+    "bs": 64,
+    "n_blocks": 3,
+    "initial_filters": 16,
+    "kernel_size": 11,
+    "padding": 5,
+    "dense_units": 128,
+    "dropout_rate": 0.30000000000000004,
+    "adaptive_pool": 1
+}

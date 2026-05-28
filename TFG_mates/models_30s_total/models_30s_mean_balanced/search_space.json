@@ -1,0 +1,18 @@
+{
+    "model_type": "IntDistribution(high=1, log=False, low=0, step=1)",
+    "n_blocks": "IntDistribution(high=4, log=False, low=2, step=1)",
+    "initial_filters": "IntDistribution(high=32, log=False, low=4, step=4)",
+    "kernel_size": "IntDistribution(high=15, log=False, low=3, step=2)",
+    "adaptive_pool": "IntDistribution(high=120, log=False, low=30, step=30)",
+    "lstm_hidden": "IntDistribution(high=128, log=False, low=32, step=32)",
+    "dense_units": "IntDistribution(high=128, log=False, low=32, step=32)",
+    "pool_size_FIJO": 2,
+    "stride_FIJO": 1,
+    "padding_FIJO": 0,
+    "lstm_layers_FIJO": 1,
+    "bidirectional_FIJO": true,
+    "dropout_FIJO": 0.3,
+    "max_pool_FIJO": 1,
+    "lr_FIJO": 0.0001,
+    "bs_FIJO": 32
+}

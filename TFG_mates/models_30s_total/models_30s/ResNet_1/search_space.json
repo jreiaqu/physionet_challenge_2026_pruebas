@@ -1,0 +1,15 @@
+{
+    "lr": "CategoricalDistribution(choices=(0.0001, 0.0005, 0.001))",
+    "bs": "CategoricalDistribution(choices=(16, 32, 64))",
+    "n_blocks": "IntDistribution(high=5, log=False, low=2, step=1)",
+    "initial_filters": "CategoricalDistribution(choices=(16, 32, 64))",
+    "kernel_size": "CategoricalDistribution(choices=(3, 5, 7, 9, 11))",
+    "dense_units": "CategoricalDistribution(choices=(64, 128, 256))",
+    "dropout_rate": "FloatDistribution(high=0.6, log=False, low=0.2, step=0.1)",
+    "adaptive_pool": "CategoricalDistribution(choices=(1,))",
+    "model_type": 2,
+    "lstm_layers_FIJO": 1,
+    "bidirectional_FIJO": true,
+    "torch.mean()": false,
+    "lr_FIJO": 0.001
+}

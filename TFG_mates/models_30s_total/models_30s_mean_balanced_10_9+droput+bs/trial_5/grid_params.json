@@ -1,0 +1,10 @@
+{
+    "model_type": 2,
+    "lstm_layers": 1,
+    "lstm_hidden": 192,
+    "bidirectional": true,
+    "dense_units": 288,
+    "dropout_rate": 0.35000000000000003,
+    "lr": 0.001,
+    "bs": 8
+}

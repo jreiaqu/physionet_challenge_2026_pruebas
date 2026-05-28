@@ -1,0 +1,16 @@
+{
+    "model_type": 1,
+    "n_blocks": 2,
+    "initial_filters": 24,
+    "kernel_size": 15,
+    "pool_size": 2,
+    "stride": 1,
+    "padding": 0,
+    "lstm_layers": 1,
+    "lstm_hidden": 128,
+    "bidirectional": true,
+    "dense_units": 32,
+    "dropout_rate": 0.25,
+    "lr": 0.0001,
+    "bs": 32
+}
