@@ -25,3 +25,29 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Modelos y checkpoints (solo los binarios pesados)
+*.pth
+*.ckpt
+models_*/
+optuna_results/
+
+# Resultados generados
+roc_*.png
+results/figures/
+dataset_errors_log.csv
+
+# Datos grandes (regenerables)
+cv_splits_balanced/
+cv_splits_unbalanced/
+data/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+*.log
+
+# Backup y archivos comprimidos grandes
+TFG_mates_backup/
+TFG_mates_backup_*.tar.gz

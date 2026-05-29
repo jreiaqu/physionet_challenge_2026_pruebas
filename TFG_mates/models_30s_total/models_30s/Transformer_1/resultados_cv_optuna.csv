@@ -1,3 +1,0 @@
-number,value,datetime_start,datetime_complete,duration,params_bs,params_d_model,params_dim_feedforward,params_dropout_rate,params_lr,params_nhead,params_num_layers,user_attrs_epochs_por_split,user_attrs_mean_epoch,user_attrs_mean_test_auc,user_attrs_mean_val_auc,state
-0,0.548042116254786,2026-04-28 17:33:11.676844,2026-04-28 20:48:23.140170,0 days 03:15:11.463326,32,128,128,0.6,0.001,2,2,"[26, 25, 16, 20, 27]",22.8,0.532703213610586,0.548042116254786,COMPLETE
-1,0.5660270913098968,2026-04-28 20:48:23.208009,2026-04-29 01:47:53.186090,0 days 04:59:29.978081,16,64,384,0.4,0.0005,2,3,"[37, 38, 19, 24, 31]",29.8,0.48572778827977314,0.5660270913098968,COMPLETE

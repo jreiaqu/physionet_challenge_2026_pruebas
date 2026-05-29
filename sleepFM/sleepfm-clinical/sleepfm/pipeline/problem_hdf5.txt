@@ -6,3 +6,5 @@ Error processing file /home/local/alumno.upv.es/jreiaqu/data/physiological_data/
 Error processing file /home/local/alumno.upv.es/jreiaqu/data/physiological_data/hdf5/sub-S0001122008137_ses-1.hdf5: Unable to synchronously open file (bad object header version number)
 Error processing file /home/local/alumno.upv.es/jreiaqu/data/physiological_data/hdf5/sub-S0001122008137_ses-1.hdf5: Unable to synchronously open file (bad object header version number)
 Error processing file /home/local/alumno.upv.es/jreiaqu/data/physiological_data/hdf5/sub-S0001122008137_ses-1.hdf5: Unable to synchronously open file (bad object header version number)
+Error processing file /home/alumno.upv.es/jreiaqu/data/physiological_data/hdf5/sub-S0001122008137_ses-1.hdf5: Unable to synchronously open file (bad object header version number)
+Error processing file /home/alumno.upv.es/jreiaqu/data/physiological_data/hdf5/sub-S0001122008137_ses-1.hdf5: Unable to synchronously open file (bad object header version number)

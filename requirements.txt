@@ -1,0 +1,39 @@
+# Generado desde Python 3.12, adaptado para Python 3.10
+# Los paquetes nvidia-* / cuda-* / triton se instalan automáticamente con torch
+#
+# INSTALAR TORCH APARTE (CUDA 13.2 / RTX 3060):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu132
+# Si cu132 no existe aún, consulta: https://pytorch.org/get-started/locally/
+numpy==2.0.2
+pandas==2.2.2
+scikit-learn==1.6.0
+scipy==1.13.1
+matplotlib==3.10.9
+optuna==4.8.0
+mne==1.12.1
+h5py==3.16.0
+edfio==0.4.10
+pyEDFlib==0.1.42
+einops==0.8.2
+huggingface_hub==1.14.0
+wandb==0.26.1
+loguru==0.7.3
+tqdm==4.67.1
+pillow==12.2.0
+requests==2.33.1
+PyYAML==6.0.3
+joblib==1.4.2
+click==8.3.3
+rich==15.0.0
+typer==0.25.1
+GitPython==3.1.50
+kaggle==1.7.4.5
+SQLAlchemy==2.0.48
+alembic==1.18.4
+pydantic==2.13.4
+httpx==0.28.1
+filelock==3.25.2
+fsspec==2026.2.0
+packaging==26.0
+sympy==1.14.0
+networkx==3.4.2
