@@ -8,19 +8,28 @@ import torch
 
 _BASE = "../sleepFM/sleepfm-clinical/sleepfm/checkpoints/model_base"
 
-# Directorios de embeddings por resolución temporal
+# Directorios de embeddings por dataset y resolución temporal: EMB_DIRS[dataset][window_size]
 EMB_DIRS = {
-    "5s":   f"{_BASE}/physionet2026",
-    "5min": f"{_BASE}/physionet2026_5min_agg",
+    "small": {
+        "5s":   f"{_BASE}/physionet2026_small",
+        "5min": f"{_BASE}/physionet2026_small_5min_agg",
+    },
+    "large": {
+        "5s":   f"{_BASE}/physionet2026_large",
+        "5min": f"{_BASE}/physionet2026_large_5min_agg",
+    },
 }
 
-# Resolución por defecto (cambiar aquí para alternar globalmente)
-DEFAULT_WINDOW_SIZE = "5min"
+# CSV de demografía/etiquetas por dataset
+CSV_PATHS = {
+    "small": "../dataset_small/demographics.csv",
+    "large": "../dataset_large_balanced/demographics.csv",
+}
 
-# Alias de compatibilidad
-EMB_DIR = EMB_DIRS[DEFAULT_WINDOW_SIZE]
+# Defaults (cambiar aquí para alternar globalmente)
+DEFAULT_DATASET      = "small"
+DEFAULT_WINDOW_SIZE  = "5min"
 
-CSV_PATH   = "../data/demographics_total.csv"
 MODALITIES = ["BAS", "EKG", "RESP", "EMG"]
 MOD_DIM    = 128   # embedding dim por modalidad por ventana
 

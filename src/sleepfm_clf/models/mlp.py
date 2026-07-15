@@ -15,10 +15,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
 
 from ..config import DEVICE
+from ..metrics import age_conditioned_auroc
 
 _WARMUP   = 10   # épocas antes de activar el early stopping
 _PATIENCE = 20   # épocas sin mejora en rolling mean antes de parar
@@ -50,9 +50,9 @@ class MLP(nn.Module):
 
 # ── Protocolo ────────────────────────────────────────────────────────────────
 
-def load_data(df, window_size=None):
+def load_data(df, window_size=None, dataset=None):
     from ..data import load_aggregated
-    return load_aggregated(df, window_size=window_size)
+    return load_aggregated(df, window_size=window_size, dataset=dataset)
 
 
 def suggest_params(trial):
@@ -70,6 +70,7 @@ def suggest_params(trial):
 
 def train_fold(data, y, tr_idx, val_idx, params=None):
     X = data
+    ages_val = data[val_idx, -2]   # age antes de StandardScaler (penúltima columna)
     p = {**DEFAULTS, **(params or {})}
     X_tr, y_tr = X[tr_idx], y[tr_idx]
     X_val, y_val = X[val_idx], y[val_idx]
@@ -87,6 +88,10 @@ def train_fold(data, y, tr_idx, val_idx, params=None):
     tr_dl = DataLoader(
         TensorDataset(torch.tensor(X_tr), torch.tensor(y_tr)),
         batch_size=p["batch_size"], shuffle=True,
+        # drop_last: un último batch de tamaño 1 revienta BatchNorm ("Expected more
+        # than 1 value per channel"). Con los tamaños de fold usados aquí nunca deja
+        # el DataLoader sin batches.
+        drop_last=True,
     )
 
     auc_history, best_roll, best_state, no_improve = [], -1.0, None, 0
@@ -109,9 +114,8 @@ def train_fold(data, y, tr_idx, val_idx, params=None):
         model.eval()
         with torch.no_grad():
             probs = torch.sigmoid(model(X_val_t)).cpu().numpy()
-        try:
-            auc = roc_auc_score(y_val, probs)
-        except ValueError:
+        auc = age_conditioned_auroc(y_val, probs, ages_val)
+        if np.isnan(auc):
             auc = 0.5
         auc_history.append(auc)
 
@@ -140,12 +144,16 @@ def train_fold(data, y, tr_idx, val_idx, params=None):
     model.eval()
     with torch.no_grad():
         best_probs = torch.sigmoid(model(X_val_t)).cpu().numpy()
-    try:
-        best_auc = roc_auc_score(y_val, best_probs)
-    except ValueError:
+    best_auc = age_conditioned_auroc(y_val, best_probs, ages_val)
+    if np.isnan(best_auc):
         best_auc = 0.5
 
     return best_auc, best_probs
+
+
+def extract_ages(data):
+    """Extrae edades del array de features (penúltima columna, antes de scaling)."""
+    return data[:, -2]
 
 
 def index_data(data, indices):

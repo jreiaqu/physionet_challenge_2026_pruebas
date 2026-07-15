@@ -1,3 +1,6 @@
+# Claude Code (config local personal, no compartida)
+.claude/settings.local.json
+
 # Datos pesados
 *.hdf5
 *.h5
@@ -34,13 +37,18 @@ optuna_results/
 
 # Resultados generados
 roc_*.png
-results/figures/
+results/
 dataset_errors_log.csv
+
+# Metadata cruda descargada de Kaggle
+dataset-metadata.json
 
 # Datos grandes (regenerables)
 cv_splits_balanced/
 cv_splits_unbalanced/
 data/
+dataset_small/
+dataset_large_balanced/
 
 # Build artifacts
 *.egg-info/

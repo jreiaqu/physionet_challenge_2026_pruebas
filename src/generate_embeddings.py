@@ -32,25 +32,26 @@ import h5py
 
 
 @click.command("generate_embeddings")
-@click.option("--model_path", type=str, default='path')
-@click.option("--dataset_name", type=str, default='mesa')
-@click.option("--channel_groups_path", type=str, default='../configs/channel_groups.json')
-# @click.option("--split_path", type=str, default='../configs/dataset_split.json')
-# @click.option("--splits", type=str, default='train,validation,test')
+@click.option("--model_path", type=str,
+              default='../sleepFM/sleepfm-clinical/sleepfm/checkpoints/model_base')
+@click.option("--dataset_name", type=str, default='physionet2026_small')
+@click.option("--hdf5_dir", type=str,
+              default='../dataset_small/physiological_data/hdf5',
+              help="Directorio con ficheros .hdf5 de entrada")
+@click.option("--channel_groups_path", type=str, default='configs/channel_groups.json')
 @click.option("--num_workers", type=int, default=16)
 @click.option("--batch_size", type=int, default=128)
 def generate_embeddings(
     model_path,
-    dataset_name, 
-    channel_groups_path, 
-    split_path,
-    splits,
-    num_workers, 
+    dataset_name,
+    hdf5_dir,
+    channel_groups_path,
+    num_workers,
     batch_size
 ):
     config_path = os.path.join(model_path, "config.json")
     config = load_config(config_path)
-    config["data_path"] = "../data/physiological_data/hdf5"
+    config["data_path"] = hdf5_dir
     channel_groups = load_data(channel_groups_path)
 
     current_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -90,7 +91,7 @@ def generate_embeddings(
         path_to_data = os.path.join(data_path, f"SHHS/{dataset_name}")
         hdf5_paths = [os.path.join(path_to_data, file_name) for file_name in os.listdir(path_to_data)]
     else:
-        hdf5_paths = sorted(glob.glob(os.path.join("../data/physiological_data/hdf5", "*.hdf5")))
+        hdf5_paths = sorted(glob(os.path.join(hdf5_dir, "*.hdf5")))
 
     logger.info(f"Number of files to process: {len(hdf5_paths)}")
 
@@ -151,15 +152,22 @@ def generate_embeddings(
 
                     with h5py.File(output_path, 'a') as hdf5_file:
                         for modality_idx, modality_type in enumerate(config["modality_types"]):
+                            emb_i = embeddings_new[modality_idx][i]
+                            suffix = tuple(int(s) for s in emb_i.shape[1:])
                             if modality_type in hdf5_file:
                                 dset = hdf5_file[modality_type]
                                 chunk_start_correct = chunk_start // (embed_dim * 5 * 60)
-                                chunk_end = chunk_start_correct + embeddings_new[modality_idx][i].shape[0]
+                                chunk_end = chunk_start_correct + emb_i.shape[0]
                                 if dset.shape[0] < chunk_end:
-                                    dset.resize((chunk_end,) + embeddings_new[modality_idx][i].shape[1:])
-                                dset[chunk_start_correct:chunk_end] = embeddings_new[modality_idx][i].cpu().numpy()
+                                    dset.resize((chunk_end,) + suffix)
+                                dset[chunk_start_correct:chunk_end] = emb_i.cpu().numpy()
                             else:
-                                hdf5_file.create_dataset(modality_type, data=embeddings_new[modality_idx][i].cpu().numpy(), chunks=(embed_dim,) + embeddings_new[modality_idx][i].shape[1:], maxshape=(None,) + embeddings_new[modality_idx][i].shape[1:])
+                                hdf5_file.create_dataset(
+                                    modality_type,
+                                    data=emb_i.cpu().numpy(),
+                                    chunks=(int(embed_dim),) + suffix,
+                                    maxshape=(None,) + suffix,
+                                )
 
                 embeddings_new = [e[1] for e in embeddings]
 
@@ -171,15 +179,22 @@ def generate_embeddings(
 
                     with h5py.File(output_path, 'a') as hdf5_file:
                         for modality_idx, modality_type in enumerate(config["modality_types"]):
+                            emb_i = embeddings_new[modality_idx][i]
+                            suffix = tuple(int(s) for s in emb_i.shape[1:])
                             if modality_type in hdf5_file:
                                 dset = hdf5_file[modality_type]
                                 chunk_start_correct = chunk_start // (embed_dim * 5)
-                                chunk_end = chunk_start_correct + embeddings_new[modality_idx][i].shape[0]
+                                chunk_end = chunk_start_correct + emb_i.shape[0]
                                 if dset.shape[0] < chunk_end:
-                                    dset.resize((chunk_end,) + embeddings_new[modality_idx][i].shape[1:])
-                                dset[chunk_start_correct:chunk_end] = embeddings_new[modality_idx][i].cpu().numpy()
+                                    dset.resize((chunk_end,) + suffix)
+                                dset[chunk_start_correct:chunk_end] = emb_i.cpu().numpy()
                             else:
-                                hdf5_file.create_dataset(modality_type, data=embeddings_new[modality_idx][i].cpu().numpy(), chunks=(embed_dim,) + embeddings_new[modality_idx][i].shape[1:], maxshape=(None,) + embeddings_new[modality_idx][i].shape[1:])
+                                hdf5_file.create_dataset(
+                                    modality_type,
+                                    data=emb_i.cpu().numpy(),
+                                    chunks=(int(embed_dim),) + suffix,
+                                    maxshape=(None,) + suffix,
+                                )
                 pbar.update()
 
 

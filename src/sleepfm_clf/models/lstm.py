@@ -21,10 +21,10 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
 
 from ..config import DEVICE
+from ..metrics import age_conditioned_auroc
 
 _WARMUP   = 10   # épocas antes de activar el early stopping
 _PATIENCE = 20   # épocas sin mejora en rolling mean antes de parar
@@ -105,9 +105,9 @@ def _collate(batch):
 
 # ── Protocolo ────────────────────────────────────────────────────────────────
 
-def load_data(df, window_size=None):
+def load_data(df, window_size=None, dataset=None):
     from ..data import load_sequences
-    return load_sequences(df, window_size=window_size)
+    return load_sequences(df, window_size=window_size, dataset=dataset)
 
 
 def suggest_params(trial):
@@ -125,6 +125,7 @@ def suggest_params(trial):
 
 def train_fold(data, y, tr_idx, val_idx, params=None):
     seqs, demos = data
+    ages_val = demos[val_idx, 0]   # age antes de StandardScaler (primer demográfico)
     p = {**DEFAULTS, **(params or {})}
     y_tr, y_val = y[tr_idx], y[val_idx]
 
@@ -189,9 +190,8 @@ def train_fold(data, y, tr_idx, val_idx, params=None):
                 logits = model(seqs_b.to(DEVICE), lengths_b.to(DEVICE), demos_b.to(DEVICE))
                 probs_list.append(torch.sigmoid(logits).cpu().numpy())
         probs = np.concatenate(probs_list)
-        try:
-            auc = roc_auc_score(y_val, probs)
-        except ValueError:
+        auc = age_conditioned_auroc(y_val, probs, ages_val)
+        if np.isnan(auc):
             auc = 0.5
         auc_history.append(auc)
 
@@ -224,12 +224,17 @@ def train_fold(data, y, tr_idx, val_idx, params=None):
             logits = model(seqs_b.to(DEVICE), lengths_b.to(DEVICE), demos_b.to(DEVICE))
             best_probs_list.append(torch.sigmoid(logits).cpu().numpy())
     best_probs = np.concatenate(best_probs_list)
-    try:
-        best_auc = roc_auc_score(y_val, best_probs)
-    except ValueError:
+    best_auc = age_conditioned_auroc(y_val, best_probs, ages_val)
+    if np.isnan(best_auc):
         best_auc = 0.5
 
     return best_auc, best_probs
+
+
+def extract_ages(data):
+    """Extrae edades del array de demográficos (primera columna, antes de scaling)."""
+    _, demos = data
+    return demos[:, 0]
 
 
 def index_data(data, indices):

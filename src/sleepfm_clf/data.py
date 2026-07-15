@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import h5py
 from tqdm import tqdm
-from .config import EMB_DIRS, DEFAULT_WINDOW_SIZE, MODALITIES, MOD_DIM
+from .config import EMB_DIRS, DEFAULT_WINDOW_SIZE, DEFAULT_DATASET, MODALITIES, MOD_DIM
 
 
 def _hdf5_path(row, emb_dir):
@@ -34,15 +34,16 @@ def _demographics(row):
     return np.array([age, sex], dtype=np.float32)
 
 
-def load_aggregated(df, window_size=None):
+def load_aggregated(df, window_size=None, dataset=None):
     """
     Para MLP: cada paciente → vector (2050,).
     Concatena [mean, std, p25, p75] por modalidad (512 × 4 = 2048) + [age, sex].
     Devuelve (X: np.ndarray (n, 2050), y: np.ndarray (n,)).
 
     window_size: "5s" | "5min" | None (usa DEFAULT_WINDOW_SIZE)
+    dataset: "small" | "large" | None (usa DEFAULT_DATASET)
     """
-    emb_dir = EMB_DIRS[window_size or DEFAULT_WINDOW_SIZE]
+    emb_dir = EMB_DIRS[dataset or DEFAULT_DATASET][window_size or DEFAULT_WINDOW_SIZE]
     X_list, y_list = [], []
     for _, row in tqdm(df.iterrows(), total=len(df), desc=f"Cargando embeddings ({window_size or DEFAULT_WINDOW_SIZE})"):
         mods = _read_hdf5(_hdf5_path(row, emb_dir))
@@ -66,15 +67,16 @@ def load_aggregated(df, window_size=None):
     return X, y
 
 
-def load_sequences(df, window_size=None):
+def load_sequences(df, window_size=None, dataset=None):
     """
     Para LSTM: cada paciente → array (n_ventanas, 512).
     Las 4 modalidades se concatenan por ventana: [BAS_t, EKG_t, RESP_t, EMG_t].
     Devuelve ((seqs: list[np.ndarray], demos: np.ndarray (n, 2)), y: np.ndarray (n,)).
 
     window_size: "5s" | "5min" | None (usa DEFAULT_WINDOW_SIZE)
+    dataset: "small" | "large" | None (usa DEFAULT_DATASET)
     """
-    emb_dir = EMB_DIRS[window_size or DEFAULT_WINDOW_SIZE]
+    emb_dir = EMB_DIRS[dataset or DEFAULT_DATASET][window_size or DEFAULT_WINDOW_SIZE]
     seqs, demos, y_list = [], [], []
     for _, row in tqdm(df.iterrows(), total=len(df), desc=f"Cargando embeddings ({window_size or DEFAULT_WINDOW_SIZE} seq)"):
         mods = _read_hdf5(_hdf5_path(row, emb_dir))

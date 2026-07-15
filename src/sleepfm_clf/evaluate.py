@@ -48,7 +48,7 @@ def run_optuna(model_module, data, y, n_trials):
         sampler=optuna.samplers.TPESampler(seed=SEED),
     )
     study.optimize(objective, n_trials=n_trials, callbacks=[callback])
-    print(f"\n  Mejor AUROC Optuna (3-fold): {study.best_value:.4f}")
+    print(f"\n  Mejor AUROC age-cond Optuna (3-fold): {study.best_value:.4f}")
     print(f"  Mejores hipers: {study.best_params}")
     return study.best_params
 
@@ -57,7 +57,7 @@ def run_cv(model_module, data, y, params):
     """5-fold CV estratificado con los params dados. Devuelve (mean, std, best_fold_data)."""
     dummy = np.arange(len(y)).reshape(-1, 1)
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=SEED)
-    aucs, best_auc, best_fold_data = [], 0.0, None
+    aucs, best_auc, best_fold_data = [], -np.inf, None
 
     print(f"\n── 5-Fold CV ───────────────────────────────────────────────────")
     for fold, (tr, val) in enumerate(skf.split(dummy, y), 1):
@@ -69,7 +69,7 @@ def run_cv(model_module, data, y, params):
             best_fold_data = (y[val], probs)
 
     mean, std = float(np.mean(aucs)), float(np.std(aucs))
-    print(f"\n  CV AUROC: {mean:.4f} ± {std:.4f}  |  mejor fold: {best_auc:.4f}")
+    print(f"\n  CV AUROC age-cond: {mean:.4f} ± {std:.4f}  |  mejor fold: {best_auc:.4f}")
     return mean, std, best_fold_data
 
 

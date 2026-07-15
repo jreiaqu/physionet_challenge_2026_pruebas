@@ -220,9 +220,17 @@ class EDFToHDF5Converter:
         samples_per_chunk = 5 * 60 * self.resample_rate
         with h5py.File(file_path, 'w') as hdf:
             for signal, name in zip(signals, channel_names):
-                dataset_name = self._get_unique_name(hdf, name)
+                # channel_groups.json matchea por igualdad exacta de string; algunos sitios
+                # (p.ej. I0006) exportan nombres en case mixto ("ChinA", "Left Leg") que no
+                # coinciden ni con las variantes en minúsculas ni en mayúsculas del json,
+                # y el paciente se descarta entero. Minúsculas es el denominador común.
+                dataset_name = self._get_unique_name(hdf, name.lower())
+                # h5py exige chunk <= tamaño del dataset en cada dimensión; una señal más
+                # corta que samples_per_chunk (5 min) revienta con "Chunk shape must not
+                # be greater than data shape" y descarta al paciente entero.
+                chunk_size = min(samples_per_chunk, len(signal)) or 1
                 hdf.create_dataset(dataset_name, data=signal,
-                                   dtype='float16', chunks=(samples_per_chunk,), compression="gzip")
+                                   dtype='float16', chunks=(chunk_size,), compression="gzip")
 
             for annot_signal, annot_name in zip(annotation_signals, annotation_names):
                 hdf.create_dataset(annot_name, data=annot_signal)
