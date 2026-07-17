@@ -1,0 +1,314 @@
+# Cola de experimentos del estudio de ablaciones sobre embeddings SleepFM congelado.
+# Ejecutar con: python run_queue.py   (ver README al final de este fichero / report.md)
+#
+# Notas de diseño:
+# - B1 (BCE) y D2 (age+sex) NO se relanzan aquí: son exactamente A0_baseline (ver esa
+#   entrada, primera de la cola). TODAS las comparativas de esta cola (B/C/D/E/F/G/H)
+#   deben leerse contra la fila `A0_baseline` de ablation_results.csv:
+#   cv5_agecond=0.6756±0.0329, loso_agecond=0.6000±0.0397, reward_balanced=0.2913.
+#   NO uses results/test_results_mlp_large_5min_20260714_170317.json (val=0.6569,
+#   test=0.6705) para estas comparativas — es un protocolo distinto (split 80/20 fijo,
+#   StratifiedKFold efímero no ligado a splits/kfold5_large.json, sin LOSO, y el
+#   metrics.py de antes de las correcciones de esta sesión). Ese número solo sirve como
+#   validación independiente de que el pipeline reproduce algo razonable, no como ancla
+#   de comparación fila a fila.
+# - "check_small: true" ejecuta el chequeo de realismo en dataset_small, pero ver
+#   report.md ("Bloqueo descubierto en smoke test"): el subconjunto limpio (sin fuga)
+#   tiene 0 positivos, así que reward_small_natural quedará vacío para TODOS los
+#   experimentos hasta que un humano decida una de las 3 opciones documentadas ahí.
+#   Se deja en true porque no cuesta nada (se salta solo) y por si se resuelve el bloqueo.
+# - Fase 1b (embeddings 5s de model_diagnosis) NO está en esta cola: es condicional al
+#   resultado de 1a (ver report.md, Fase 1). Añádela tú mismo tras revisar 1a:
+#     python generate_diagnosis_embeddings.py --dataset large --window-size 5s
+#   y duplica el experimento 1a con window_size: 5s.
+# - Familias F/G/H usan window_size: 5s (F1/F3/G/H, para alinear fases de 30s a tokens
+#   finos) o 5min (F2, que solo concatena escalares — no necesita alineación fina).
+# - Ninguna config 5s trunca por defecto (max_seq_len sin fijar = secuencia completa,
+#   igual que A1_attention_5s). La mediana real de ventanas por paciente en 5s es ~10860
+#   (~15h de grabación — verificado sobre 150 pacientes), y A1 tardó ~8.5h SIN truncar
+#   (20 trials + 5-fold + LOSO + refit-small). Es una decisión deliberada: no se sacrifica
+#   información de entrenamiento para ganar velocidad. `max_seq_len` sigue existiendo como
+#   parámetro de config si en algún momento se quiere truncar explícitamente (recorta
+#   siempre desde el inicio de la grabación, slicing directo del HDF5) — no se usa aquí.
+#   La velocidad se ataca en el código (DataLoader con workers/pin_memory + precisión
+#   mixta en las familias de secuencia: attention/hierarchical/caisr_stage), no con datos.
+# - deployable: false marca configs que usan marcas HUMANAS como INPUT — NUNCA se deben
+#   promover a modelo final (Regla Dura del brief). Existen solo como profesor de
+#   comparación (Familia G) o profesor de destilación (Familia H).
+
+experiments:
+
+  # ── A0 — baseline DENTRO del harness de ablaciones (YA CORRIÓ, ver resultado) ─────
+  # Ya completado: cv5_agecond=0.6756±0.0329, loso_agecond=0.6000±0.0397 (por sitio
+  # I0002=0.6502, I0006=0.5531, S0001=0.5968), reward_balanced=0.2913, AUROC
+  # estándar=0.6722, AUPRC=0.6814, F1=0.6207, umbral Youden=0.4861 (ver fila
+  # `A0_baseline` en ablation_results.csv y sección homónima en report.md).
+  # ESTA es la fila de referencia para TODAS las comparativas de la cola (B/C/D/E/F/G/H)
+  # — no el A0 de train_clf.py (val=0.6569/test=0.6705, en
+  # results/test_results_mlp_large_5min_*.json), que usa un protocolo distinto (split
+  # 80/20 fijo, StratifiedKFold efímero no ligado a splits/kfold5_large.json, sin LOSO,
+  # y el metrics.py de ANTES de las correcciones de esta sesión) y no es comparable fila
+  # a fila contra cv5_agecond_mean/loso_agecond_mean/reward_balanced del resto de la
+  # cola — solo sirve como validación independiente de que el pipeline reproduce algo
+  # razonable. Sirve también como B1 (BCE) y D2 (age+sex) — no se relanzan por separado.
+  - exp_id: A0_baseline
+    family: "A0"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce}
+    notes: "Baseline dentro del harness — referencia directa para cv5/LOSO/reward de toda la cola. Ver nota arriba sobre por qué no es lo mismo que el A0 de train_clf.py."
+
+  # ── FASE 1 — Checkpoint base (máxima prioridad, casi gratis) ──────────────────────
+  - exp_id: 1a_diag_mlp_5min
+    family: "Fase1"
+    model: diag_mlp
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_diagnosis
+    deployable: true
+    notes: "Comparar directamente contra A0_baseline (cv5=0.6756±0.0329, loso=0.6000±0.0397, model_base 5min stats). Ya corrió con peor resultado (cv5=0.6316, loso=0.5430) incluso contra el número antiguo de train_clf.py — con el A0_baseline correcto la brecha es aún mayor. Si gana con claridad en una revisión futura, decidir Fase 1b y repensar el resto de la cola con model_diagnosis como base; con este resultado no se justifica."
+
+  # ── FAMILIA A — Representación (5s completo, sin truncación de lstm.py) ───────────
+  - exp_id: A1_attention_5s
+    family: "A"
+    model: ablation
+    dataset: large
+    window_size: 5s
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: attention, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, max_seq_len: null}
+
+  - exp_id: A2_hierarchical_5s
+    family: "A"
+    model: ablation
+    dataset: large
+    window_size: 5s
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: hierarchical, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, block_size: 60}
+
+  - exp_id: A3_stats_extended_5min
+    family: "A"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats_extended, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce}
+
+  # ── FAMILIA B — Pérdida (sobre la representación stats de A0; reajustar si A gana) ─
+  - exp_id: B2_focal_5min
+    family: "B"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: focal}
+
+  - exp_id: B3_paired_5min
+    family: "B"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: paired}
+
+  # ── FAMILIA C — Modalidades ───────────────────────────────────────────────────────
+  - exp_id: C1_bas_only
+    family: "C"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS], demo_level: age_sex, loss: bce}
+
+  - exp_id: C1_ekg_only
+    family: "C"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [EKG], demo_level: age_sex, loss: bce}
+
+  - exp_id: C1_resp_only
+    family: "C"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [RESP], demo_level: age_sex, loss: bce}
+
+  - exp_id: C1_emg_only
+    family: "C"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [EMG], demo_level: age_sex, loss: bce}
+
+  - exp_id: C2_bas_resp
+    family: "C"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, RESP], demo_level: age_sex, loss: bce}
+
+  - exp_id: C3_gating
+    family: "C"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, gating: true}
+
+  - exp_id: C4_modality_dropout
+    family: "C"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, modality_dropout: 0.3}
+
+  # ── FAMILIA D — Demografía ────────────────────────────────────────────────────────
+  - exp_id: D1_no_demo
+    family: "D"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, EKG, RESP, EMG], demo_level: none, loss: bce}
+
+  - exp_id: D3_full_demo
+    family: "D"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, EKG, RESP, EMG], demo_level: full, loss: bce}
+
+  # ── FAMILIA E — Supervivencia (encoder congelado, Time_to_Event) ──────────────────
+  - exp_id: E1_coxph
+    family: "E"
+    model: coxph
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {aux_bce_weight: 0.0}
+
+  - exp_id: E2_coxph_aux_bce
+    family: "E"
+    model: coxph
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {aux_bce_weight: 0.5}
+
+  # ── FAMILIA F — Fusión temprana con marcas CAISR (test-safe) ──────────────────────
+  - exp_id: F1_pool_by_stage
+    family: "F"
+    model: ablation
+    dataset: large
+    window_size: 5s
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: caisr_stage, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, caisr: {mode: pool_by_stage, source: caisr}}
+
+  - exp_id: F2_clinical_indices
+    family: "F"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: stats, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, caisr: {mode: clinical_indices, source: caisr}}
+
+  - exp_id: F3_both
+    family: "F"
+    model: ablation
+    dataset: large
+    window_size: 5s
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: caisr_stage, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, caisr: {mode: both, source: caisr}}
+
+  # ── FAMILIA G — Diagnóstico del hueco humano↔CAISR (decide si corre la Familia H) ──
+  # Config idéntica a F3 salvo la fuente de fases/índices. G_human usa marcas humanas
+  # SOLO para construir este modelo de comparación — nunca se despliega.
+  - exp_id: G_caisr
+    family: "G"
+    model: ablation
+    dataset: large
+    window_size: 5s
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    config: {pooling: caisr_stage, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, caisr: {mode: both, source: caisr}}
+    notes: "Réplica de F3 bajo family=G para el cálculo del hueco (ver maybe_resolve_G_gate en run_queue.py)."
+
+  - exp_id: G_human
+    family: "G"
+    model: ablation
+    dataset: large
+    window_size: 5s
+    n_trials: 20
+    base_embedding: model_base
+    deployable: false
+    config: {pooling: caisr_stage, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, caisr: {mode: both, source: human}}
+    notes: "SOLO diagnóstico — usa marcas humanas como input. NUNCA promover a modelo desplegable."
+
+  # ── FAMILIA H — Destilación privilegiada (CONDICIONAL: solo si hueco G >= 0.03) ───
+  - exp_id: H_student
+    family: "H"
+    model: ablation
+    dataset: large
+    window_size: 5s
+    n_trials: 20
+    base_embedding: model_base
+    deployable: true
+    teacher_exp_id: G_human
+    config: {pooling: caisr_stage, modalities: [BAS, EKG, RESP, EMG], demo_level: age_sex, loss: bce, caisr: {mode: both, source: caisr}, distill_alpha: 0.5}
+    notes: "run_queue.py comprueba automáticamente el gate de G antes de correr esto; si el hueco < 0.03 se salta y se anota en report.md."
+
+  # ── FAMILIA J — Ensemble (al final; usa los OOF ya calibrados de los top-k) ───────
+  - exp_id: J_ensemble_top3
+    family: "J"
+    k: 3
+    notes: "Media de probabilidades calibradas (isotónica, OOF) de los 3 mejores experimentos por LOSO age-cond AUROC ya completados en results.csv."

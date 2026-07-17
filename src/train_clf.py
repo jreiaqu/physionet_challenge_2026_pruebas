@@ -88,7 +88,7 @@ def main():
     best_params = evaluate.run_optuna(model_module, data_tv, y_tv, n_trials=args.trials)
 
     # ── 5-fold CV con los mejores hiperparámetros ─────────────────────────────
-    cv_mean, cv_std, best_fold = evaluate.run_cv(model_module, data_tv, y_tv, best_params)
+    cv_mean, cv_std, best_fold, _oof = evaluate.run_cv(model_module, data_tv, y_tv, best_params)
 
     # Umbral óptimo (Youden's J) fijado sobre el mejor fold de validación
     if best_fold is not None:

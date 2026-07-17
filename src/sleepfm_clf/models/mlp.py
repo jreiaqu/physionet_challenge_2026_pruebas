@@ -55,17 +55,30 @@ def load_data(df, window_size=None, dataset=None):
     return load_aggregated(df, window_size=window_size, dataset=dataset)
 
 
+_HIDDEN_DIMS = {
+    "128": [128], "256": [256], "512": [512], "1024": [1024],
+    "256-128": [256, 128], "512-256": [512, 256],
+    "1024-512": [1024, 512], "512-256-128": [512, 256, 128],
+}
+
+
 def suggest_params(trial):
     return {
-        "hidden_dims":  trial.suggest_categorical("hidden_dims", [
-            [128], [256], [512], [1024],
-            [256, 128], [512, 256], [1024, 512], [512, 256, 128],
-        ]),
+        "hidden_dims":  _HIDDEN_DIMS[trial.suggest_categorical("hidden_dims", list(_HIDDEN_DIMS.keys()))],
         "dropout":      trial.suggest_float("dropout",      0.1, 0.5),
         "lr":           trial.suggest_float("lr",           1e-4, 1e-2, log=True),
         "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True),
         "batch_size":   trial.suggest_categorical("batch_size", [16, 32, 64]),
     }
+
+
+def resolve_params(params):
+    """study.best_params trae la clave string cruda de hidden_dims (ver suggest_params) —
+    tradúcela de vuelta a la lista real antes de usarla para entrenar."""
+    params = dict(params)
+    if "hidden_dims" in params and isinstance(params["hidden_dims"], str):
+        params["hidden_dims"] = _HIDDEN_DIMS[params["hidden_dims"]]
+    return params
 
 
 def train_fold(data, y, tr_idx, val_idx, params=None):

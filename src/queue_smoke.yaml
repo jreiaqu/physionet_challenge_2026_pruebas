@@ -1,0 +1,14 @@
+experiments:
+  - exp_id: SMOKE_A0
+    family: "A"
+    model: ablation
+    dataset: large
+    window_size: 5min
+    n_trials: 1
+    base_embedding: model_base
+    deployable: true
+    config:
+      pooling: stats
+      modalities: ["BAS", "EKG", "RESP", "EMG"]
+      demo_level: age_sex
+      loss: bce

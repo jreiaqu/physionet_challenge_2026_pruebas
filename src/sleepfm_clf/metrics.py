@@ -15,8 +15,12 @@ def age_conditioned_auroc(y_true, y_score, ages, delta=2.0):
     """
     AUROC restringido a parejas (positivo i, negativo j) con |age_i - age_j| <= delta.
 
-    Fórmula del challenge:
-        s_C = Pr(z_i >= z_j | x_i=1, x_j=0, |age_i - age_j| <= delta)
+    Fórmula del challenge (compute_auroc_age en evaluate_model.py oficial,
+    physionetchallenges/python-example-2026):
+        s_C = Pr(z_i > z_j | x_i=1, x_j=0, |age_i - age_j| <= delta) + 0.5 * Pr(z_i == z_j | ...)
+
+    Los empates cuentan como victoria parcial (0.5), igual que el script oficial —
+    con salidas continuas de sigmoid esto rara vez importa, pero mantiene paridad exacta.
 
     Retorna np.nan si no existe ninguna pareja válida (warning emitido).
     Complejidad O(n_pos × n_neg) vectorizado — válido para n < 2000.
@@ -49,23 +53,30 @@ def age_conditioned_auroc(y_true, y_score, ages, delta=2.0):
         )
         return np.nan
 
-    wins = ((pos_scores[:, None] >= neg_scores[None, :]) & valid).sum()
+    diff = pos_scores[:, None] - neg_scores[None, :]
+    wins = (np.where(diff > 0, 1.0, np.where(diff == 0, 0.5, 0.0)) * valid).sum()
     return float(wins) / n_valid
 
 
 def prevalence_reward(y_true, y_pred_binary, ages, train_ages, train_labels, delta=2.0):
     """
-    Reward del challenge ponderado por prevalencia local estimada en training.
+    Reward del challenge ponderado por prevalencia local, replicando compute_prevalence +
+    compute_reward de evaluate_model.py oficial (physionetchallenges/python-example-2026).
 
-    Para cada paciente k:
-      p_a = prevalencia de positivos en training con |age - age_k| <= delta
+    Diferencia con el reto real: el script oficial toma la prevalencia de un fichero de
+    "prevalence data" separado (una referencia poblacional distinta de train/test); en local
+    no existe ese fichero, así que usamos train (train_ages/train_labels) como proxy — es una
+    aproximación razonable pero anótalo si comparas contra el reward oficial del reto.
+
+    Para cada paciente k, con m = len(y_true):
+      num_pos_local = nº positivos de train con |age - age_k| <= delta
+      n_local       = nº pacientes de train con |age - age_k| <= delta
+      p_a = max(num_pos_local, 0.5) / n_local   (si n_local == 0 → prevalencia global)
+      p_a clamp a [0.5/m, 1 - 0.5/m]            (evita p=0/1 exactos, nunca excluye pacientes)
       r_k:  TP → 1/p_a - 1  |  FP → -1  |  FN → -1  |  TN → 1/(1-p_a) - 1
 
-    Casos extremos:
-      - Sin pacientes de training en la ventana  → prevalencia global (warning).
-      - p_a = 0 o p_a = 1                        → paciente excluido (warning).
-
-    Retorna (mean_reward: float, per_patient_rewards: np.ndarray).
+    Retorna (mean_reward: float, per_patient_rewards: np.ndarray) — sobre TODOS los pacientes,
+    sin exclusiones (igual que el oficial).
     """
     y_true        = np.asarray(y_true,        dtype=float)
     y_pred_binary = np.asarray(y_pred_binary, dtype=float)
@@ -73,38 +84,25 @@ def prevalence_reward(y_true, y_pred_binary, ages, train_ages, train_labels, del
     train_ages    = np.asarray(train_ages,    dtype=float)
     train_labels  = np.asarray(train_labels,  dtype=float)
 
+    m = len(y_true)
     global_prev = float(train_labels.mean()) if len(train_labels) > 0 else 0.5
+    eps = 0.5 / m if m > 0 else 1e-6
 
-    rewards  = []
-    excluded = 0
+    rewards = []
+    n_global_fallback = 0
 
-    for k in range(len(y_true)):
+    for k in range(m):
         age_k = ages[k]
         local = np.abs(train_ages - age_k) <= delta
+        n_local = int(local.sum())
 
-        if local.sum() == 0:
-            warnings.warn(
-                f"prevalence_reward: sin pacientes de training con |age - {age_k:.1f}| "
-                f"<= {delta}. Usando prevalencia global ({global_prev:.3f})."
-            )
+        if n_local == 0:
+            n_global_fallback += 1
             p_a = global_prev
         else:
-            p_a = float(train_labels[local].mean())
+            p_a = max(float(train_labels[local].sum()), 0.5) / n_local
 
-        if p_a == 0.0:
-            warnings.warn(
-                f"prevalence_reward: p_a=0 (sin positivos) para edad={age_k:.1f}. "
-                "Paciente excluido del reward."
-            )
-            excluded += 1
-            continue
-        if p_a == 1.0:
-            warnings.warn(
-                f"prevalence_reward: p_a=1 (sin negativos) para edad={age_k:.1f}. "
-                "Paciente excluido del reward."
-            )
-            excluded += 1
-            continue
+        p_a = min(max(p_a, eps), 1.0 - eps)
 
         x_k = y_true[k]
         y_k = y_pred_binary[k]
@@ -116,11 +114,14 @@ def prevalence_reward(y_true, y_pred_binary, ages, train_ages, train_labels, del
 
         rewards.append(r_k)
 
-    if excluded > 0:
-        warnings.warn(f"prevalence_reward: {excluded} paciente(s) excluido(s) por p_a extrema.")
+    if n_global_fallback > 0:
+        warnings.warn(
+            f"prevalence_reward: {n_global_fallback} paciente(s) sin ventana de edad en "
+            f"train; se usó la prevalencia global ({global_prev:.3f})."
+        )
 
     if len(rewards) == 0:
-        warnings.warn("prevalence_reward: ningún paciente contribuye al reward. Devolviendo np.nan.")
+        warnings.warn("prevalence_reward: ningún paciente evaluado. Devolviendo np.nan.")
         return np.nan, np.array([])
 
     return float(np.mean(rewards)), np.array(rewards)
@@ -167,6 +168,14 @@ def _test_age_conditioned_auroc():
         assert np.isnan(auc), f"Esperado np.nan, obtenido {auc}"
         assert len(w) >= 1
 
+    # Caso 4: empate de score entre pos y neg → cuenta como victoria parcial (0.5),
+    # igual que compute_auroc_age del script oficial (no 1.0 como una comparación >=).
+    y  = np.array([1., 0.])
+    sc = np.array([0.5, 0.5])
+    ag = np.array([60., 61.])
+    auc = age_conditioned_auroc(y, sc, ag, delta=2)
+    assert auc == 0.5, f"Esperado 0.5 (empate), obtenido {auc}"
+
     print("  age_conditioned_auroc: OK")
 
 
@@ -184,15 +193,14 @@ def _test_prevalence_reward():
     mean_r, _ = prevalence_reward(y_true, y_pred, ages, train_ages, train_labels, delta=2)
     assert abs(mean_r - expected) < 1e-6, f"Esperado {expected:.4f}, obtenido {mean_r:.4f}"
 
-    # p_a = 0 → exclusión con warning
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        mean_r, rewards = prevalence_reward(
-            np.array([0.]), np.array([0.]),
-            np.array([60.]), np.array([60.]), np.array([0.]), delta=2
-        )
-        assert np.isnan(mean_r)
-        assert len(rewards) == 0
+    # p_a=0 (sin positivos en la ventana de train) → smoothing (num=max(0,0.5)/n_local),
+    # NUNCA se excluye al paciente (paridad con compute_reward oficial: siempre puntúa).
+    mean_r, rewards = prevalence_reward(
+        np.array([0.]), np.array([0.]),
+        np.array([60.]), np.array([60.]), np.array([0.]), delta=2
+    )
+    # n_local=1, p_a=max(0,0.5)/1=0.5 → clamp con m=1, eps=0.5 → p_a=0.5 → TN: 1/(1-0.5)-1=1.0
+    assert len(rewards) == 1 and abs(mean_r - 1.0) < 1e-6, f"Esperado 1.0, obtenido {mean_r}"
 
     print("  prevalence_reward: OK")
 
